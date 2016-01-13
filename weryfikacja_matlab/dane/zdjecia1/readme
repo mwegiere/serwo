@@ -1,0 +1,8 @@
+zdjecia dla typowej pozycji diod
+T_CW.txt - przekształcenie kamera->świat czyli pozycja świata w układzie kamery
+T_DC(diody).txt - przekształcenie wzorzec -> kamera czyli pozycja kamery w układzie wzorca (diody)
+T_DC(szach).txt - przekształcenie wzorzec -> kamera czyli pozycja kamery w układzie wzorca (szachownica)
+
+istnieją 2 algorytmy lokalizacji diod:
+stary algorytm - diody przeskakiały w piksel
+nowy algorytm - diody są stabilne

@@ -1,0 +1,32 @@
+<launch>
+
+  <include file="$(find rtt_ros)/launch/deployer.launch">
+    <arg name="NAME" value="IRP6_OROCOS_ROBOT"/>
+    <arg name="DEPLOYER_ARGS" value="-s $(find irp6_bringup)/config/irp6.ops"/>
+    <arg name="LOG_LEVEL" value="Warning"/>
+    <arg name="DEBUG" value="false"/>
+  </include>
+
+  
+  <include file="$(find irp6_bringup)/launch/irp6-p-inside.launch" ns="IRP6_OROCOS_ROBOT">
+  </include>
+  
+  <include file="$(find irp6_bringup)/launch/irp6-ot-inside.launch" ns="IRP6_OROCOS_ROBOT">
+  </include>
+
+  <group ns="IRP6_OROCOS_ROBOT">
+    <rosparam>
+      Irp6pHardwareInterface:
+        test_mode: true
+      Irp6otHardwareInterface:
+        test_mode: true
+      ATI6284:
+        test_mode: true
+      ATI3084:
+        test_mode: true
+      HapticScheme:
+        scheme_name: haptic_manager
+    </rosparam>
+  </group>
+
+</launch>

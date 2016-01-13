@@ -1,0 +1,32 @@
+
+wiki do robotów irp6
+https://github.com/RCPRG-ros-pkg/irp6_robot/wiki
+
+Zapisywanie obrazu z kamery
+rosrun image_view image_view image:=/camera/image_color _filename_format:="frame%04i.png"
+
+Siłowe zabijanie procesu:
+ps -a
+kill -9 17048
+
+konwerter euler<->quaternion
+http://quat.zachbennett.com/
+
+zmiana magicznej liczby w pliku
+ws_irp6/underlay/src/irp6_robot/irp6_bringup/launch/irp6-p-inside.launch
+w linii 122
+synchro_motor_position: [-15.9, -5.0, -8.527, 151.31, (432.25)+/-10, 791.0]
+
+przywrócenie do aktualnej wersji na serwerze
+svn revert * -R
+
+kalibracja kamery
+rosrun camera_calibration cameracalibrator.py --size 5x6 --square 0.03 image:=/camera/image_raw camera:=/camera
+
+rosrun camera_calibration cameracalibrator.py --size 8x6 --square 0.108 image:=/my_camera/image camera:=/my_camera
+
+matlab
+/opt/MATLAB/R2013b/bin
+
+https://192.168.18.220/twiki/bin/view/Main
+

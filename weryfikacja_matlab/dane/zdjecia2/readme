@@ -1,0 +1,4 @@
+zdjecia dla pozycji lekko obróconej 
+T_CW.txt - przekształcenie kamera->świat czyli pozycja świata w układzie kamery
+T_DC(diody).txt - przekształcenie wzorzec -> kamera czyli pozycja kamery w układzie wzorca (diody)
+T_DC(szach).txt - przekształcenie wzorzec -> kamera czyli pozycja kamery w układzie wzorca (szachownica)
