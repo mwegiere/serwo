@@ -22,6 +22,7 @@ class Irp6Control {
   Irp6Control(ros::NodeHandle &nh);
   void run();
   ros::NodeHandle nh_;
+  ros::Rate loop_rate;
 
 private:
   double error_y; //actual error in y axis
@@ -49,7 +50,7 @@ private:
 
   ros::Publisher fcl_param_publisher;
   ros::Publisher tg_param_publisher;
-  //ros::Rate loop_rate;
+  
   force_control_msgs::ForceControl forceControlGoal;
   force_control_msgs::ToolGravityParam tg_goal;
 
@@ -85,7 +86,7 @@ private:
   void pos_cartesian_y_callback(const geometry_msgs::Pose& msg);
 };
 
-Irp6Control::Irp6Control(ros::NodeHandle &nh) {
+Irp6Control::Irp6Control(ros::NodeHandle &nh) : loop_rate(500){
   nh_ = nh;
 
   error_y = 0.0;
@@ -97,12 +98,12 @@ Irp6Control::Irp6Control(ros::NodeHandle &nh) {
   newVel_y = 0.0;
   newAcceleration_y = 0.0;
 
-  p = 0.5;
+  p = 0.1;
   i = 0.0;
   d = 0.0;
 
   maxVel_y = 0.05;
-  maxAcceleration_y = 25.0;
+  maxAcceleration_y = 10.0;
   min_max_pos_cartesian_y = 0.3;
 
   current_pos_cartesian_y = 5.0;
@@ -136,9 +137,9 @@ void Irp6Control::VelSteering(double v_y){
     inertia.rotation = inertia2;
     forceControlGoal.inertia = inertia;
 
-    reciprocaldamping1.x = 0.0025;
-    reciprocaldamping1.y = 0.0025;
-    reciprocaldamping1.z = 0.0025;
+    reciprocaldamping1.x = 0.0;
+    reciprocaldamping1.y = 0.0;
+    reciprocaldamping1.z = 0.0;
 
     reciprocaldamping2.x = 0.0;
     reciprocaldamping2.y = 0.0;
@@ -192,14 +193,16 @@ void Irp6Control::pos_cartesian_y_callback(const geometry_msgs::Pose& msg) {
 }
 
 void Irp6Control::calculateNewVel() {
-    if (error_y > minError_y || error_y < -minError_y)
+    /*if (error_y > minError_y || error_y < -minError_y)
     {
         newVel_y = error_y * p;
     }
     else
     {
       newVel_y = 0.0;
-    }
+    }*/
+    //newVel_y = 0.001;
+    newVel_y = 0.01;
   }
 
 void Irp6Control::calculateNewCartesianPose() {
@@ -208,25 +211,26 @@ void Irp6Control::calculateNewCartesianPose() {
 
 void Irp6Control::calculateNewAcceleration() {
     newAcceleration_y = newVel_y * frequency;
+    std::cout<<"przyspieszenie: "<<newAcceleration_y<<std::endl;
 }
 
 void Irp6Control::checkVelocityLimits() {
-    if (newVel_y > maxVel_y){
+    /*if (newVel_y > maxVel_y){
         newVel_y = maxVel_y;
     }
 
     if (newVel_y < -maxVel_y){
         newVel_y = -maxVel_y;
-    }
+    }*/
 }
 
 void Irp6Control::checkAccelerationLimits() {
-    if (newAcceleration_y > maxAcceleration_y){
+    /*if (newAcceleration_y > maxAcceleration_y){
         newVel_y = maxVel_y;
     }
     if (newAcceleration_y < -maxAcceleration_y){
         newVel_y = -maxVel_y;
-    }
+    }*/
 }
 
 void Irp6Control::checkCartesianLimits() {
@@ -263,12 +267,11 @@ int main(int argc, char **argv) {
   ros::NodeHandle nh;
   Irp6Control control(nh);
 
-  //ros::spinOnce();
-
   while (ros::ok())
    {
    control.run();
    ros::spinOnce();
+   control.loop_rate.sleep();
    }
 
   return 0;

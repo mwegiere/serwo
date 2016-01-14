@@ -5,6 +5,11 @@
 #include <cmath>
 #include <serwo/ErrorInfo.h>
 
+#include <iostream>
+#include <chrono>
+
+#include <fstream>
+
 class ImageProcessing {
  public:
   ImageProcessing(ros::NodeHandle &nh);
@@ -54,6 +59,7 @@ void ImageProcessing::callback(const sensor_msgs::ImageConstPtr& img) {
 }
 
 std::vector<cv::Point2f> ImageProcessing::Generate2DPoints() {
+
   cv::Mat image = sourceImage;
 
   //wsp maksymalnych składowych
@@ -165,9 +171,9 @@ std::vector<cv::Point2f> ImageProcessing::Generate2DPoints() {
       }
   }
 
-  int licznik = 0;
-  int suma_i = 0;
-  int suma_j = 0;
+  //int licznik = 0;
+  //int suma_i = 0;
+  //int suma_j = 0;
   maxW = 0;
   if (wsp_maxW.y - 3 > 0 && wsp_maxW.y + 3 < rows && wsp_maxW.x - 3 > 0 && wsp_maxW.x + 3 < cols){
       for (i = wsp_maxW.y - 3; i < wsp_maxW.y + 3; ++i) {
@@ -206,7 +212,6 @@ std::vector<cv::Point2f> ImageProcessing::Generate2DPoints() {
   std::cout<<wsp_maxR<<std::endl;
   std::cout<<maxG<<std::endl;
   std::cout<<""<<std::endl;*/
-
   return gridPoints;
 }
 
@@ -253,16 +258,28 @@ std::vector<cv::Point3f> ImageProcessing::Generate3DPoints() {
 
 int main(int argc, char **argv) {
 
+   std::ofstream pnp_time;
+   pnp_time.open ("pnp_time.txt");
+   std::ofstream recognition_time;
+   recognition_time.open ("recognition_time.txt");
+
+
   static char * tmp = NULL;
   static int tmpi;
   ros::init(tmpi, &tmp, "image_processing", ros::init_options::NoSigintHandler);
   ros::NodeHandle nh;
   ImageProcessing imageProcessing(nh);
 
-  while (ros::ok()) {
+  while (ros::ok() ){
     //updating image points
+    auto start_recognition= std::chrono::high_resolution_clock::now();
     imageProcessing.imagePoints = imageProcessing.Generate2DPoints();
+    auto finish_recognition = std::chrono::high_resolution_clock::now();
+    recognition_time << std::chrono::duration_cast<std::chrono::nanoseconds>(finish_recognition-start_recognition).count()<<"\n";
+
     //solvePnP
+    auto start_pnp = std::chrono::high_resolution_clock::now();
+
     cv::solvePnP(imageProcessing.objectPoints, imageProcessing.imagePoints,
                  imageProcessing.cameraMatrix, imageProcessing.distCoeffs,
                  imageProcessing.rvec, imageProcessing.tvec);
@@ -282,7 +299,11 @@ int main(int argc, char **argv) {
     //publish message
     imageProcessing.grid_info_pub.publish(imageProcessing.msg);
 
+    auto finish_pnp = std::chrono::high_resolution_clock::now();
+    pnp_time << std::chrono::duration_cast<std::chrono::nanoseconds>(finish_pnp-start_pnp).count()<<"\n";
     ros::spinOnce();
   }
+  pnp_time.close();
+  recognition_time.close();
   return 0;
 }

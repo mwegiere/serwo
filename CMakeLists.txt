@@ -13,6 +13,62 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
 )
 
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+	  
+	  # using GCC/Linux
+	  message (STATUS "GCC/Linux" )
+	  execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
+	  
+	  if (GCC_VERSION VERSION_GREATER 4.7 OR GCC_VERSION VERSION_EQUAL 4.7)
+	    message(STATUS "Info: g++ version >= 4.7 using C++11")  
+	  elseif ()
+	    message (FATAL_ERROR "g++ version >= 4.7 is required")
+	  endif()
+	  
+	  # Do I need this ?
+	  #add_definitions(-DBOOST_THREAD_USE_LIB)
+	  
+	  # NOTE: gnu++11 enables GNU's violating options, whereas c++11 is strictly only the new version
+	  # static libstdc++ linkage solves issues in Gentoo/OpenNao where packages of newer gcc don't exist.
+	  # Ideally you should setup using export LD_LIBRARY_PATH, but this is a quick and dirty way of packaging librapp
+	  # -static-libstdc++
+	  # -stdlib=libc++ will link using an alternative to gcc std c++ library - WARNING not working on OpenNao
+	  # -static-libgcc will link statically GLIBC
+	
+	  # TODO: Parse static-libstdc++ argument from Command line
+	  set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-std=gnu++11 -Wall -fPIC -static-libstdc++")
+	  message(STATUS "CXX Flags: " ${CMAKE_CXX_FLAGS})
+	  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+	  #set(CMAKE_EXE_LINKER_FLAGS "-lc++ -lcxxrt") # Set linker flags - WARNING alternative c++ libraries not present on OpenNao
+	  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -mtune=native -march=native") # -s ?
+	  set(BUILD_SHARED_LIBS OFF)
+	  message(STATUS "CXX Linker: " ${CMAKE_EXE_LINKER_FLAGS})
+	
+	elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+	    # using Clang
+	    message (STATUS "Clang/OSX" )
+	    execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
+	    if (CLANG_VERSION_MAJOR VERSION_GREATER 3 OR CLANG_VERSION_MAJOR VERSION_EQUAL 3)
+	        message(STATUS "Info: Clang >= 3.0 using C++11")
+	    elseif ()
+	        message(FATAL_ERROR "Clang version >= 3.0 is required")
+	    endif()
+	        set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-std=c++11 -Wall")
+	        message(STATUS "CXX Flags: " ${CMAKE_CXX_FLAGS})
+	        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+	        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -mtune=native -march=native")
+	        set(BUILD_SHARED_LIBS OFF)
+	        message(STATUS "CXX Linker: " ${CMAKE_EXE_LINKER_FLAGS})
+	
+	# Intel Compiler May run on Linux - Maybe we should support it
+	elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
+	    message (FATAL_ERROR "unsupported compiler")
+	
+	# We cannot support Microsoft Visual Studio - We cannot support Win32 platforms
+	elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+	    message (FATAL_ERROR "unsupported compiler")
+	endif()
+
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
@@ -178,6 +234,14 @@ add_dependencies(listener serwo_generate_messages_cpp)
 add_executable(image_process_diod src/y/image_process_diod.cpp)
 target_link_libraries(image_process_diod ${catkin_LIBRARIES})
 add_dependencies(image_process_diod serwo_generate_messages_cpp)
+
+add_executable(image_process_diod_time src/y/image_process_diod_time.cpp)
+target_link_libraries(image_process_diod_time ${catkin_LIBRARIES})
+add_dependencies(image_process_diod_time serwo_generate_messages_cpp)
+
+add_executable(image_process_chessboard_time src/y/image_process_chessboard_time.cpp)
+target_link_libraries(image_process_chessboard_time ${catkin_LIBRARIES})
+add_dependencies(image_process_chessboard_time serwo_generate_messages_cpp)
 
 add_executable(grid_visualization src/rviz/grid_visualization.cpp)
 target_link_libraries(grid_visualization ${catkin_LIBRARIES})
