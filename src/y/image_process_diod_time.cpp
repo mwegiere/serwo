@@ -171,9 +171,6 @@ std::vector<cv::Point2f> ImageProcessing::Generate2DPoints() {
       }
   }
 
-  //int licznik = 0;
-  //int suma_i = 0;
-  //int suma_j = 0;
   maxW = 0;
   if (wsp_maxW.y - 3 > 0 && wsp_maxW.y + 3 < rows && wsp_maxW.x - 3 > 0 && wsp_maxW.x + 3 < cols){
       for (i = wsp_maxW.y - 3; i < wsp_maxW.y + 3; ++i) {
@@ -269,38 +266,46 @@ int main(int argc, char **argv) {
   ros::init(tmpi, &tmp, "image_processing", ros::init_options::NoSigintHandler);
   ros::NodeHandle nh;
   ImageProcessing imageProcessing(nh);
+  int i = 0;
+  while (/*ros::ok()*/ i < 101 ){
 
-  while (ros::ok() ){
-    //updating image points
-    auto start_recognition= std::chrono::high_resolution_clock::now();
-    imageProcessing.imagePoints = imageProcessing.Generate2DPoints();
-    auto finish_recognition = std::chrono::high_resolution_clock::now();
-    recognition_time << std::chrono::duration_cast<std::chrono::nanoseconds>(finish_recognition-start_recognition).count()<<"\n";
+    auto start_recognition= std::chrono::high_resolution_clock::now(); //start time count
+    imageProcessing.imagePoints = imageProcessing.Generate2DPoints(); //updating image points
+    auto finish_recognition = std::chrono::high_resolution_clock::now(); //stop time count
+    if(imageProcessing.found == 1){
+        recognition_time << std::chrono::duration_cast<std::chrono::nanoseconds>(finish_recognition-start_recognition).count()<<"\n"; //save time
+    }
 
-    //solvePnP
-    auto start_pnp = std::chrono::high_resolution_clock::now();
+    auto start_pnp = std::chrono::high_resolution_clock::now(); //start time count
 
+    if(imageProcessing.found == 1){
+    ++i;
     cv::solvePnP(imageProcessing.objectPoints, imageProcessing.imagePoints,
                  imageProcessing.cameraMatrix, imageProcessing.distCoeffs,
-                 imageProcessing.rvec, imageProcessing.tvec);
-    //change rvec to matrix
+                 imageProcessing.rvec, imageProcessing.tvec);//solvePnP
+
     cv::Mat_<double> rotationMatrix;
-    cv::Rodrigues(imageProcessing.rvec, rotationMatrix);
-    //final matrix (grid position in camera frame)
+    cv::Rodrigues(imageProcessing.rvec, rotationMatrix);//change rvec to matrix
     cv::Mat pattern_pose =
         (cv::Mat_<double>(4, 4) << rotationMatrix(0, 0), rotationMatrix(0, 1), rotationMatrix(
             0, 2), imageProcessing.tvec(0), rotationMatrix(1, 0), rotationMatrix(
             1, 1), rotationMatrix(1, 2), imageProcessing.tvec(1), rotationMatrix(
             2, 0), rotationMatrix(2, 1), rotationMatrix(2, 2), imageProcessing
-            .tvec(2), 0, 0, 0, 1);
-
+            .tvec(2), 0, 0, 0, 1);//final matrix (grid position in camera frame)
     imageProcessing.msg.error = imageProcessing.tvec(0);
-    imageProcessing.msg.found = imageProcessing.found;
-    //publish message
-    imageProcessing.grid_info_pub.publish(imageProcessing.msg);
 
-    auto finish_pnp = std::chrono::high_resolution_clock::now();
-    pnp_time << std::chrono::duration_cast<std::chrono::nanoseconds>(finish_pnp-start_pnp).count()<<"\n";
+    }
+    if(imageProcessing.found == 0){
+        imageProcessing.msg.error = 0;
+    }
+    imageProcessing.msg.found = imageProcessing.found;    
+    imageProcessing.grid_info_pub.publish(imageProcessing.msg);//publish message
+
+    auto finish_pnp = std::chrono::high_resolution_clock::now(); //stop time count
+    if(imageProcessing.found == 1){
+       pnp_time << std::chrono::duration_cast<std::chrono::nanoseconds>(finish_pnp-start_pnp).count()<<"\n"; //save time
+    }
+
     ros::spinOnce();
   }
   pnp_time.close();

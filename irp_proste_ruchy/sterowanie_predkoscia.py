@@ -42,7 +42,7 @@ if __name__ == '__main__':
         #0.ustawienie magicznej liczby
         #1. ustawienie robota w pozycji pionowej
         #pozycja_pionowa()
-	predkosc(-0.05)
+	predkosc(0.0)
 	#for i in range(1000):
         #	predkosc()
         #2. ustawienie narzedzia o dlugosci - odleglosc przeciecia osi nad chwytakiem do tasmociagu 

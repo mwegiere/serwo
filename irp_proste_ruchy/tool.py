@@ -4,8 +4,9 @@ from irpos import *
 from std_msgs.msg import *
 
 def pozycja_pionowa():
-	#irpos.move_to_motor_position([-14.845596084538569, 14.828317324943825, 2.7064820710676067, 147.2464476737536, 69.27840119696212, 1217.3294541542018], 10.0)
-	irpos.move_to_joint_position([0.0, -1.57079632679, -0.0, -0.0, 4.71238898038, 1.57079632679], 10.0)
+        #irpos.move_to_joint_position([0.0, -1.57079632679, -0.0, -0.0, 4.71238898038, 1.57079632679], 10.0)
+        irpos.move_to_joint_position([0.0, -1.57079632679, -0.0, -0.0, 4.71238898038, -1.7656950321275604], 10.0)
+
         print "Pozycja startowa ustawiona"
 
 def ustawianie_narzedzia(z):
@@ -17,6 +18,8 @@ def obracanie_chwytaka():
 	for i in range(70):
 		#irpos.move_rel_to_cartesian_pose(40.0,Pose(Point(0.0, 0.0, 0.0), Quaternion(0.60876, 0.0, 0.0, -0.79335)))#-75 st.
 		irpos.move_rel_to_cartesian_pose(1.0,Pose(Point(0.0, 0.0, 0.0), Quaternion(-0.00872654, 0.0, 0.0, 0.99996192)))
+
+
 
 def wyswietl_aktualna_pozycje():
 	print "joint position"
@@ -34,11 +37,16 @@ if __name__ == '__main__':
 	irpos = IRPOS("maciek", "Irp6p", 6, "irp6p_manager")
         #0.ustawienie magicznej liczby
         #1. ustawienie robota w pozycji pionowej
-        pozycja_pionowa()
+        #pozycja_pionowa()
         #2. ustawienie narzedzia o dlugosci - odleglosc przeciecia osi nad chwytakiem do tasmociagu 
-	#ustawianie_narzedzia(0.5)
+       # ustawianie_narzedzia(0.5)
 	#3. ustawienie robota pod katem -45 st.
-	#wyswietl_aktualna_pozycje()
+        #wyswietl_aktualna_pozycje()
+
+        #irpos.move_rel_to_cartesian_pose(1.0,Pose(Point(0.0, 0.0, 0.0), Quaternion(-0.00872654, 0.0, 0.0, 0.99996192)))#na lewo
+        #for i in range(44):
+        irpos.move_rel_to_cartesian_pose(1.0,Pose(Point(0.0, 0.0, 0.0), Quaternion(-0.00873, 0.0, 0.0, -0.99996)))
+
 	#obracanie_chwytaka()
 	#wyswietl_aktualna_pozycje()
 

@@ -6,7 +6,7 @@
 #include <serwo/ErrorInfo.h>
 
 #include <iostream>
-//#include <chrono>
+#include <chrono>
 
 #include <fstream>
 
@@ -34,7 +34,6 @@ class ImageProcessing {
   //translation vector
   cv::Mat_<double> tvec;
   //-----------------------------------
-
   //1/0 depends on diod grid was found / not found
   int found;
 
@@ -65,7 +64,6 @@ std::vector<cv::Point2f> ImageProcessing::Generate2DPoints() {
 
   cv::Mat image = sourceImage;
   cv::Mat out;
-  std::cout<<"aa"<<std::endl;
   //cv::cvtColor(image, out, CV_RGB2GRAY);
 
   //patternSize = cvSize(5,4);
@@ -123,7 +121,7 @@ std::vector<cv::Point3f> ImageProcessing::Generate3DPoints() {
   }
   return modelPoints;
 }
-
+/*
 int main(int argc, char **argv) {
 
    //std::ofstream pnp_time;
@@ -147,7 +145,7 @@ int main(int argc, char **argv) {
 
 //  /ros::spinOnce();
   loop_rate.sleep();
-  while (ros::ok()) {
+  while (i < 101) {
 
     //updating image points
     //auto start_recognition= std::chrono::high_resolution_clock::now();
@@ -163,11 +161,11 @@ int main(int argc, char **argv) {
 
     std::cout<<a<<std::endl;
 
-    //auto finish_recognition = std::chrono::high_resolution_clock::now();
-    //recognition_time << std::chrono::duration_cast<std::chrono::nanoseconds>(finish_recognition-start_recognition).count()<<"\n";
+    auto finish_recognition = std::chrono::high_resolution_clock::now();
+    recognition_time << std::chrono::duration_cast<std::chrono::nanoseconds>(finish_recognition-start_recognition).count()<<"\n";
 
     //solvePnP
-    //auto start_pnp = std::chrono::high_resolution_clock::now();
+    auto start_pnp = std::chrono::high_resolution_clock::now();
 
     cv::solvePnP(imageProcessing.objectPoints, imageProcessing.imagePoints,
                  imageProcessing.cameraMatrix, imageProcessing.distCoeffs,
@@ -185,18 +183,99 @@ int main(int argc, char **argv) {
             .tvec(2), 0, 0, 0, 1);
 
     imageProcessing.msg.error = imageProcessing.tvec(0);
-    imageProcessing.msg.found = 1;
-    //imageProcessing.msg.found = imageProcessing.found;
+    imageProcessing.msg.found = imageProcessing.found;
 
     //publish message
     imageProcessing.grid_info_pub.publish(imageProcessing.msg);
 
-    //auto finish_pnp = std::chrono::high_resolution_clock::now();
-    //pnp_time << std::chrono::duration_cast<std::chrono::nanoseconds>(finish_pnp-start_pnp).count()<<"\n";
+    auto finish_pnp = std::chrono::high_resolution_clock::now();
+    pnp_time << std::chrono::duration_cast<std::chrono::nanoseconds>(finish_pnp-start_pnp).count()<<"\n";
 
     ros::spinOnce();
   }
   //pnp_time.close();
   //recognition_time.close();
+  return 0;
+}
+*/
+
+int main(int argc, char **argv) {
+
+   std::ofstream pnp_time;
+   pnp_time.open ("pnp_time.txt");
+   std::ofstream recognition_time;
+   recognition_time.open ("recognition_time.txt");
+
+
+  static char * tmp = NULL;
+  static int tmpi;
+  ros::init(tmpi, &tmp, "image_processing", ros::init_options::NoSigintHandler);
+  ros::NodeHandle nh;
+  ImageProcessing imageProcessing(nh);
+  int i = 0;
+
+  ros::Rate loop_rate(10);
+  loop_rate.sleep();
+
+  while (imageProcessing.sourceImage.size().height == 0){
+        ros::spinOnce();
+    loop_rate.sleep();
+  }
+
+  while (/*ros::ok()*/ i < 101 ){
+
+    auto start_recognition= std::chrono::high_resolution_clock::now(); //start time count
+    cv::Mat image = imageProcessing.sourceImage;
+    cv::Mat out;
+
+    cv::cvtColor(image, out, CV_RGB2GRAY);
+
+
+    bool a = cv::findChessboardCorners(out, cvSize(5,4), imageProcessing.imagePoints);
+    auto finish_recognition = std::chrono::high_resolution_clock::now(); //stop time count
+    if (a == true){
+        imageProcessing.found = 1;
+    }
+    else{
+        imageProcessing.found = 0;
+    }
+    if(imageProcessing.found == 1){
+        recognition_time << std::chrono::duration_cast<std::chrono::nanoseconds>(finish_recognition-start_recognition).count()<<"\n"; //save time
+    }
+
+    auto start_pnp = std::chrono::high_resolution_clock::now(); //start time count
+
+    if(imageProcessing.found == 1){
+    ++i;
+    cv::solvePnP(imageProcessing.objectPoints, imageProcessing.imagePoints,
+                 imageProcessing.cameraMatrix, imageProcessing.distCoeffs,
+                 imageProcessing.rvec, imageProcessing.tvec);//solvePnP
+
+    cv::Mat_<double> rotationMatrix;
+    cv::Rodrigues(imageProcessing.rvec, rotationMatrix);//change rvec to matrix
+    cv::Mat pattern_pose =
+        (cv::Mat_<double>(4, 4) << rotationMatrix(0, 0), rotationMatrix(0, 1), rotationMatrix(
+            0, 2), imageProcessing.tvec(0), rotationMatrix(1, 0), rotationMatrix(
+            1, 1), rotationMatrix(1, 2), imageProcessing.tvec(1), rotationMatrix(
+            2, 0), rotationMatrix(2, 1), rotationMatrix(2, 2), imageProcessing
+            .tvec(2), 0, 0, 0, 1);//final matrix (grid position in camera frame)
+    imageProcessing.msg.error = imageProcessing.tvec(0);
+
+    }
+    if(imageProcessing.found == 0){
+        imageProcessing.msg.error = 0;
+    }
+    imageProcessing.msg.found = imageProcessing.found;
+    imageProcessing.grid_info_pub.publish(imageProcessing.msg);//publish message
+
+    auto finish_pnp = std::chrono::high_resolution_clock::now(); //stop time count
+    if(imageProcessing.found == 1){
+       pnp_time << std::chrono::duration_cast<std::chrono::nanoseconds>(finish_pnp-start_pnp).count()<<"\n"; //save time
+    }
+
+    ros::spinOnce();
+  }
+  pnp_time.close();
+  recognition_time.close();
   return 0;
 }

@@ -49,6 +49,7 @@ class image_converter:
     self.image = None
     self.client = dynamic_reconfigure.client.Client("/camera/camera_nodelet", timeout=1, config_callback=self.dynamicReconfigureCallback)
 
+    #tworzenie folderow do zapisu zdjec
     os.mkdir("jasne");
     os.mkdir("ciemne");
     for i in range(71):
@@ -63,8 +64,7 @@ class image_converter:
 
     listener = tf.TransformListener()
     rate = rospy.Rate(1.0)
-    T_CW_file = open("/home/mwegiere/ws_irp6/mwegiere_ws/src/serwo/T_CW", "wb")
-
+    
     for i in range(71):
        rate.sleep()
        (trans,rot) = listener.lookupTransform('/p_c_optical_frame', '/world', rospy.Time(0))
@@ -72,10 +72,21 @@ class image_converter:
        homogenous[0][3] = trans[0]
        homogenous[1][3] = trans[1]
        homogenous[2][3] = trans[2]
-        
+
+       T_CW_file_jasne = open("/home/mwegiere/ws_irp6/mwegiere_ws/src/serwo/T_CW_jasne"+str(i), "wb")
+       T_CW_file_ciemne = open("/home/mwegiere/ws_irp6/mwegiere_ws/src/serwo/T_CW_ciemne"+str(i), "wb")
+
        for j in range(50):
-	       self.client.update_configuration({"shutter_speed":1})
-	       self.client.update_configuration({"gain":30.0})
+          for j in range(4):
+             for k in range(4):
+                T_CW_file_jasne.write(str(homogenous[j][k])+"\n")
+
+       T_CW_file.close()
+       
+       for j in range(50):
+	       self.client.update_configuration({"frame_rate":2})
+	       self.client.update_configuration({"shutter_speed":0.2})
+	       self.client.update_configuration({"gain":20.0})
 	       self.image = None
 	       while not self.image:
 		  print "wait for image"
@@ -93,6 +104,7 @@ class image_converter:
 	       print "I'm done!"
 
        for j in range(50):
+	       self.client.update_configuration({"frame_rate":60})
 	       self.client.update_configuration({"shutter_speed":0.001})
 	       self.client.update_configuration({"gain":0.0})
 	       self.image = None
@@ -109,10 +121,10 @@ class image_converter:
 	       		cv2.imwrite(fname, self.bridge.imgmsg_to_cv2(self.goodImages[k], "bgr8"))
                self.goodImages = []
 	       print "I'm done!"
-       
+
        self.irpos.move_rel_to_cartesian_pose(1.0,Pose(Point(0.0, 0.0, 0.0), Quaternion(-0.00872654, 0.0, 0.0, 0.99996192)))
        
-    T_CW_file.close()
+       
 
   def makePhotoCallback(self, data):  
     try:  
@@ -126,6 +138,7 @@ class image_converter:
   def dynamicReconfigureCallback(self,config):
     rospy.loginfo("Config set to {shutter_speed}".format(**config))
     rospy.loginfo("Config set to {gain}".format(**config))
+    rospy.loginfo("Config set to {frame_rate}".format(**config))
 
 def main(args):
   ic = image_converter()
