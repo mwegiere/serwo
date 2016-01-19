@@ -30,8 +30,8 @@ import roslib
 roslib.load_manifest('serwo')
 import rospy
 import math
-import tf
-from tf import transformations
+import tf2_ros
+#import tf2_ros import transformations
 import numpy
 import geometry_msgs.msg
 
@@ -51,21 +51,23 @@ class image_converter:
  
   def run(self):
     homogenous = np.array([[0,0,0,2],[0,3,4,4],[5,5,6,3],[0,0,0,1]])
-    self.irpos.move_to_joint_position([0.0, -1.57079632679, -0.0, -0.0, 4.71238898038, 1.57079632679], 10.0)
-    self.irpos.set_tool_geometry_params(Pose(Point(0.0, 0.0, 0.5), Quaternion(0.0, 0.0, 0.0, 1.0)))
+    #self.irpos.move_to_joint_position([0.0, -1.57079632679, -0.0, -0.0, 4.71238898038, 1.57079632679], 10.0)
+    #self.irpos.set_tool_geometry_params(Pose(Point(0.0, 0.0, 0.5), Quaternion(0.0, 0.0, 0.0, 1.0)))
 
-    listener = tf.TransformListener()
-    rate = rospy.Rate(1.0)
+    buffer = tf2_ros.Buffer()
+    listener = tf2_ros.TransformListener(buffer)
+    rate = rospy.Rate(10.0)
     T_CW_file = open("/home/mwegiere/ws_irp6/mwegiere_ws/src/serwo/T_CW", "wb")
 
-    for i in range(35):
-       	self.irpos.move_rel_to_cartesian_pose(1.0,Pose(Point(0.0, 0.0, 0.0), Quaternion(-0.00872654, 0.0, 0.0, 0.99996192)))
+    #for i in range(35):
+    #   	self.irpos.move_rel_to_cartesian_pose(1.0,Pose(Point(0.0, 0.0, 0.0), Quaternion(-0.00872654, 0.0, 0.0, 0.99996192)))
 
     for i in range(70):
        print "aa"
        #zapisanie aktualnego przeksztalcenia z /p_c_optical_frame do /world
        rate.sleep()
-       (trans,rot) = listener.lookupTransform('/p_c_optical_frame', '/world', rospy.Time(0))
+       #listener.waitForTransform("/p_c_optical_frame", "/world", rospy.Time(), rospy.Duration(20.0))
+       (trans,rot) = listener.lookup_transform('/p_c_optical_frame', '/world', rospy.Time(0))
        homogenous = quaternion_matrix(rot)    
        homogenous[0][3] = trans[0]
        homogenous[1][3] = trans[1]

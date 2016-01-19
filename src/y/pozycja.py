@@ -4,7 +4,9 @@ from irpos import *
 from std_msgs.msg import *
 
 def pozycja_pionowa():
-	irpos.move_to_joint_position([0.0, -1.57079632679, -0.0, -0.0, 4.71238898038, 1.57079632679], 10.0)
+        #irpos.move_to_joint_position([0.0, -1.57079632679, -0.0, -0.0, 4.71238898038, 1.57079632679], 10.0) #niska
+        irpos.move_to_joint_position([0.0, -1.57093110400, -0.28, 0.25, 4.68876483458, 1.56756245541], 10.0) #wysoka
+
         print "Pozycja startowa ustawiona"
 
 def ustawianie_narzedzia(z):
@@ -35,10 +37,11 @@ if __name__ == '__main__':
         #1. ustawienie robota w pozycji pionowej
         pozycja_pionowa()
         #2. ustawienie narzedzia o dlugosci - odleglosc przeciecia osi nad chwytakiem do tasmociagu 
-	#ustawianie_narzedzia(0.5)
+        #ustawianie_narzedzia(0.7)
 	#3. ustawienie robota pod katem -45 st.
-	#wyswietl_aktualna_pozycje()
+        #wyswietl_aktualna_pozycje()
 	#obracanie_chwytaka()
 	#wyswietl_aktualna_pozycje()
 
-	
+        #for i in range(65):
+         #   irpos.move_rel_to_cartesian_pose(1.0,Pose(Point(0.0, 0.0, 0.0), Quaternion(-0.00872654, 0.0, 0.0, 0.99996192)))

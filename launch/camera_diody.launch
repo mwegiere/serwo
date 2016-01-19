@@ -1,0 +1,47 @@
+<launch>
+   <!-- Determine this using rosrun pointgrey_camera_driver list_cameras.
+       If not specified, defaults to first camera found. -->
+  <arg name="camera_serial" default="13481977" />
+  <!--<arg name="camera_serial" default="14180973" /-->
+  <arg name="calibrated" default="0" />
+
+  <group ns="camera">
+    <node pkg="nodelet" type="nodelet" name="camera_nodelet_manager" args="manager" />
+
+    <node pkg="nodelet" type="nodelet" name="camera_nodelet"
+          args="load pointgrey_camera_driver/PointGreyCameraNodelet camera_nodelet_manager" >
+      <param name="frame_id" value="camera" />
+      <param name="serial" value="$(arg camera_serial)" 
+/>
+
+      <!-- When unspecified, the driver will use the default framerate as given by the
+           camera itself. Use this parameter to override that value for cameras capable of
+           other framerates. -->
+      <param name="frame_rate" value="60" />
+      
+      <param name="gain" value="0.0" />
+      
+      <!-- shutter_speed in seconds -->
+      <!--param name="shutter_speed" value="0.1" /-->
+      <param name="shutter_speed" value="0.001" />
+
+
+     
+      <param name="auto_gain" value="False" />
+      <param name="auto_shutter" value="False" />
+      <param name="auto_exposure" value="False" />
+      <param name="auto_white_balance" value="False" />
+      <!--param name="white_balance_blue" value="1023" /-->
+      <param name="white_balance_blue" value="800" />
+
+
+      <!-- Use the camera_calibration package to create this file -->
+      <param name="camera_info_url" if="$(arg calibrated)"
+             value="file://$(env HOME)/.ros/camera_info/$(arg camera_serial).yaml" />
+    </node>
+
+    <node pkg="nodelet" type="nodelet" name="image_proc_debayer"
+          args="load image_proc/debayer camera_nodelet_manager">
+    </node>
+  </group>
+</launch>

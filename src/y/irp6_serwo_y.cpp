@@ -1,298 +1,304 @@
-#include "ros/ros.h"
-#include <image_transport/image_transport.h>
-#include <cv_bridge/cv_bridge.h>
-#include <opencv2/opencv.hpp>
-#include <cmath>
+#include <ros/ros.h>
+#include <visualization_msgs/Marker.h>
+#include <std_msgs/Float64.h>
 #include <serwo/ErrorInfo.h>
-
+#include <cmath>
+#include <vector>
+#include <opencv2/opencv.hpp>
 #include <iostream>
+#include <tf/transform_listener.h>
+#include <control_msgs/FollowJointTrajectoryAction.h>
+#include <control_msgs/FollowJointTrajectoryGoal.h>
+#include <actionlib/client/simple_action_client.h>
+
+#include <force_control_msgs/ForceControl.h>
+#include <force_control_msgs/ToolGravityParam.h>
+
+#include <geometry_msgs/Inertia.h>
+#include <geometry_msgs/Vector3.h>
 
 #include <fstream>
 
-class ImageProcessing {
+class Irp6Control {
  public:
-  ImageProcessing(ros::NodeHandle &nh);
-  //-----------------------------------
-  //++++input of SolvePnP++++
-  //generating camera image points
-  std::vector<cv::Point2f> Generate2DPoints();
-  //generating real object points
-  std::vector<cv::Point3f> Generate3DPoints();
-  //camera image points
-  std::vector<cv::Point2f> imagePoints;
-  //real object points
-  std::vector<cv::Point3f> objectPoints;
-  //distort coefficients
-  cv::Mat distCoeffs;
-  //camera matrix
-  cv::Mat cameraMatrix;
-  //-----------------------------------
-  //++++output of SolvePnP++++
-  //rotation vector
-  cv::Mat_<double> rvec;
-  //translation vector
-  cv::Mat_<double> tvec;
-  //-----------------------------------
+  Irp6Control(ros::NodeHandle &nh);
+  void run();
+  ros::NodeHandle nh_;
+  ros::Rate loop_rate;
 
-  //1/0 depends on diod grid was found / not found
-  int found;
 
-  //-----------------------------------
-  //mesage to be published (grid position in camera frame)
-  serwo::ErrorInfo msg;
-  //publisher (grid position in camera frame)
-  ros::Publisher grid_info_pub;
+  double error_y; //actual error in y axis
+
+  double e2, e1, e0, u2, u1, u0;  // variables used in PID computation
+  double r;  // command
+  double y;  // plant output
+  // -- these parameters should be user-adjustable
+  double Kp = 0.012622295959545;   // proportional gain
+  double Ki = 0.0000526235234073302;	// integral gain
+  double Kd = 0.672688766296438;  	// derivative gain
+  int N = 75.5037031133956;   		// filter coefficients
+  double Ts = 0.002;   // This must match actual sampling time PID
+
+  double a0, a1, a2, b0, b1, b2, ku0, ku1, ku2, kw0, ke0, ke1, ke2;
 
  private:
-  //original image from camera
-  cv::Mat sourceImage;
-  ros::NodeHandle nh_;
-  //subscribe an image from camera topic
-  ros::Subscriber imageSubscriber;
-  //callback function used for subscribe image from topic
-  void callback(const sensor_msgs::ImageConstPtr& img);
+
+  double pre_error_y;
+  int found; //information whether object was found by camera (1), or not (0)
+  int frequency;  //velocity steering frequency
+  double dt;
+
+  double minError_y;  //minimal error to calculate new velocity
+
+  double newVel_y;  //new velocity in y axis
+  double newAcceleration_y;  //new acceleration in y axis
+
+  double p;  //p value for PID regulator
+  double i;  //i value for PID regulator
+  double d;  //d value for PID regulator
+
+  double maxVel_y; //max velocity in y axis
+  double maxAcceleration_y; //max acceleration in y axis
+  double min_max_pos_cartesian_y; //position constraint in y axis (symetrical)
+
+  double current_pos_cartesian_y; //actual position in y axis
+  double new_pos_cartesian_y; //new position in y axis
+
+
+  ros::Subscriber error_info_subscriber;
+  ros::Subscriber pos_cartesian_y_subscriber;
+
+  ros::Publisher fcl_param_publisher;
+  ros::Publisher tg_param_publisher;
+  
+  force_control_msgs::ForceControl forceControlGoal;
+  force_control_msgs::ToolGravityParam tg_goal;
+
+  geometry_msgs::Vector3 inertia1;
+  geometry_msgs::Vector3 inertia2;
+  force_control_msgs::Inertia inertia;
+  geometry_msgs::Vector3 reciprocaldamping1;
+  geometry_msgs::Vector3 reciprocaldamping2;
+  force_control_msgs::ReciprocalDamping reciprocaldamping;
+  geometry_msgs::Vector3 wrench1;
+  geometry_msgs::Vector3 wrench2;
+  geometry_msgs::Wrench wrench;
+
+  geometry_msgs::Vector3 twist1;
+  geometry_msgs::Vector3 twist2;
+  geometry_msgs::Twist twist;
+
+  geometry_msgs::Vector3 mass_center;
+
+  void VelSteering(double);
+  void callback();
+  void calculateNewVel();
+  void calculateNewCartesianPose();
+  void calculateNewAcceleration();
+  void checkVelocityLimits();
+  void checkCartesianLimits();
+  void setZeroValues();
+  void setNewVelocity();
+  void calculateAndSetNewValues();
+  void TestLimits();
+  void error_info_callback(const serwo::ErrorInfo&);
+  void pos_cartesian_y_callback(const geometry_msgs::Pose& msg);
 };
 
-void ImageProcessing::callback(const sensor_msgs::ImageConstPtr& img) {
-  sourceImage = cv_bridge::toCvShare(img, "bgr8")->image.clone();
-}
-
-std::vector<cv::Point2f> ImageProcessing::Generate2DPoints() {
-
-  cv::Mat image = sourceImage;
-
-  //wsp maksymalnych składowych
-  cv::Point2f wsp_maxB;
-  cv::Point2f wsp_maxG;
-  cv::Point2f wsp_maxR;
-  cv::Point2f wsp_maxW;
-
-  wsp_maxB.x = 0;
-  wsp_maxB.y = 0;
-  wsp_maxG.x = 0;
-  wsp_maxG.y = 0;
-  wsp_maxR.x = 0;
-  wsp_maxR.y = 0;
-  wsp_maxW.x = 0;
-  wsp_maxW.y = 0;
-
-  int maxB = 0;
-  int maxG = 0;
-  int maxR = 0;
-  int maxW = 0;
-
-  int rows = image.size().height;
-  int cols = image.size().width;
-
-  uchar * ptr;
-  for (int i = 3; i < rows; ++i) {
-    ptr = image.ptr(i);
-    for (int j = 3; j < cols; ++j) {
-      int b = ptr[3 * j];
-      int g = ptr[3 * j + 1];
-      int r = ptr[3 * j + 2];
-
-      if (b - (r + g) > maxB) {
-        wsp_maxB.y = i;
-        wsp_maxB.x = j;
-        maxB = b - (r + g);
-      }
-
-      if (g - (r + b) > maxG) {
-        wsp_maxG.y = i;
-        wsp_maxG.x = j;
-        maxG = g - (r + b);
-      }
-
-      if (r - (g + b) > maxR) {
-        wsp_maxR.y = i;
-        wsp_maxR.x = j;
-        maxR = r - (g + b);
-      }
-
-      if (r + g + b > maxW) {
-        wsp_maxW.y = i;
-        wsp_maxW.x = j;
-        maxW = r + g + b;
-      }
-    }
-  }
-
-  cv::Point2f wsp_maxB_new;
-  cv::Point2f wsp_maxG_new;
-  cv::Point2f wsp_maxR_new;
-  cv::Point2f wsp_maxW_new;
-
-  int i = 0;
-  int j = 0;
-  maxB = 0;
-  maxG = 0;
-  if (wsp_maxB.y - 3 > 0 && wsp_maxB.y + 3 < rows && wsp_maxB.x - 3 > 0 && wsp_maxB.x + 3 < cols){
-      for (i = wsp_maxB.y - 3; i < wsp_maxB.y + 3; ++i) {
-          ptr = image.ptr(i);
-          for (j = wsp_maxB.x - 3; j < wsp_maxB.x + 3; ++j) {
-              if (ptr[3*j] > maxB){
-                  maxB = ptr[3*j];
-                  wsp_maxB_new.y = i;
-                  wsp_maxB_new.x = j;
-              }
-          }
-      }
-  }
-
-  maxB = 0;
-  maxG = 0;
-  if (wsp_maxG.y - 3 > 0 && wsp_maxG.y + 3 < rows && wsp_maxG.x - 3 > 0 && wsp_maxG.x + 3 < cols){
-      for (i = wsp_maxG.y - 3; i < wsp_maxG.y + 3; ++i) {
-          ptr = image.ptr(i);
-          for (j = wsp_maxG.x - 3; j < wsp_maxG.x + 3; ++j) {
-              if (ptr[3*j+1] > maxG){
-                  maxG = ptr[3*j+1];
-                  wsp_maxG_new.y = i;
-                  wsp_maxG_new.x = j;
-              }
-          }
-      }
-  }
-
-  maxB = 0;
-  maxG = 0;
-  if (wsp_maxR.y - 3 > 0 && wsp_maxR.y + 3 < rows && wsp_maxR.x - 3 > 0 && wsp_maxR.x + 3 < cols){
-      for (i = wsp_maxR.y - 3; i < wsp_maxR.y + 3; ++i) {
-          ptr = image.ptr(i);
-          for (j = wsp_maxR.x - 3; j < wsp_maxR.x + 3; ++j) {
-              if (ptr[3*j+2] > maxG){
-                  maxG = ptr[3*j+2];
-                  wsp_maxR_new.y = i;
-                  wsp_maxR_new.x = j;
-              }
-          }
-      }
-  }
-
-  maxW = 0;
-  if (wsp_maxW.y - 3 > 0 && wsp_maxW.y + 3 < rows && wsp_maxW.x - 3 > 0 && wsp_maxW.x + 3 < cols){
-      for (i = wsp_maxW.y - 3; i < wsp_maxW.y + 3; ++i) {
-          ptr = image.ptr(i);
-          for (j = wsp_maxW.x - 3; j < wsp_maxW.x + 3; ++j) {
-                  if (ptr[3*j] + ptr[3*j+1]  > maxW){
-                      maxW = ptr[3*j] + ptr[3*j+1];
-                      wsp_maxW_new.y = i;
-                      wsp_maxW_new.x = j;
-                  }
-          }
-      }
-  }
-
-  std::vector<cv::Point2f> gridPoints;
-
-  if(wsp_maxB_new.x != 0 && wsp_maxB_new.y != 0 && wsp_maxG_new.x != 0 && wsp_maxG_new.y != 0 && wsp_maxR_new.x != 0 && wsp_maxR_new.y != 0 && wsp_maxW_new.x != 0 && wsp_maxW_new.y != 0){
-      found = 1;
-  }
-  else{
-      found = 0;
-  }
-
-  gridPoints.push_back(wsp_maxB_new);
-  gridPoints.push_back(wsp_maxG_new);
-  gridPoints.push_back(wsp_maxR_new);
-  gridPoints.push_back(wsp_maxW_new);
-
-  /*std::cout<<"B"<<std::endl;
-  std::cout<<wsp_maxB<<std::endl;
-  std::cout<<"G"<<std::endl;
-  std::cout<<wsp_maxG<<std::endl;
-  std::cout<<"W"<<std::endl;
-  std::cout<<wsp_maxW<<std::endl;
-  std::cout<<"R"<<std::endl;
-  std::cout<<wsp_maxR<<std::endl;
-  std::cout<<maxG<<std::endl;
-  std::cout<<""<<std::endl;*/
-  return gridPoints;
-}
-
-ImageProcessing::ImageProcessing(ros::NodeHandle &nh) {
+Irp6Control::Irp6Control(ros::NodeHandle &nh) : loop_rate(500){
   nh_ = nh;
-  imageSubscriber = nh_.subscribe("/camera/image_color", 1000,
-                                  &ImageProcessing::callback, this);
 
-  grid_info_pub = nh_.advertise<serwo::ErrorInfo>("/error", 1);
+  error_y = 0.0;
+  pre_error_y = 0.0;
+  found = 0;
+  frequency = 500;
+  dt = 0.002;
 
-  //3D model points are constant
-  objectPoints = Generate3DPoints();
+  minError_y = 0.01;
 
-  distCoeffs = cv::Mat(5, 1, cv::DataType<double>::type);
-  distCoeffs.at<double>(0) = -0.413271;
-  distCoeffs.at<double>(1) = 0.172960;
-  distCoeffs.at<double>(2) = -0.004729;
-  distCoeffs.at<double>(3) = -0.000895;
-  distCoeffs.at<double>(4) = 0.0;
+  newVel_y = 0.0;
+  newAcceleration_y = 0.0;
 
-  cameraMatrix = cv::Mat(3, 3, cv::DataType<double>::type);
-  cameraMatrix.at<double>(0, 0) = 1080.054285;
-  cameraMatrix.at<double>(0, 1) = 0.0;
-  cameraMatrix.at<double>(0, 2) = 655.287407;
-  cameraMatrix.at<double>(1, 0) = 0.0;
-  cameraMatrix.at<double>(1, 1) = 1072.245647;
-  cameraMatrix.at<double>(1, 2) = 524.778361;
-  cameraMatrix.at<double>(2, 0) = 0.0;
-  cameraMatrix.at<double>(2, 1) = 0.0;
-  cameraMatrix.at<double>(2, 2) = 1.0;
+  p = 0.012622295959545;
+  i = 0.000052623523407;
+  d = 0.672688766296438;
 
-  rvec = cv::Mat(3, 1, cv::DataType<double>::type);
-  tvec = cv::Mat(3, 1, cv::DataType<double>::type);
+  maxVel_y = 0.05;
+  min_max_pos_cartesian_y = 0.35;
+
+  current_pos_cartesian_y = 5.0;
+  new_pos_cartesian_y = 0.0;
+
+  error_info_subscriber = nh_.subscribe("error", 1,
+                                        &Irp6Control::error_info_callback,
+                                        this);
+
+  pos_cartesian_y_subscriber = nh_.subscribe("/irp6p_arm/cartesian_position", 1,
+                                        &Irp6Control::pos_cartesian_y_callback,
+                                        this);
+
+  fcl_param_publisher = nh_.advertise<force_control_msgs::ForceControl>("/irp6p_arm/fcl_param", 1);
+  tg_param_publisher = nh_.advertise<force_control_msgs::ToolGravityParam>("/irp6p_arm/tg_param", 1);
+
+  forceControlGoal = force_control_msgs::ForceControl();
+  tg_goal = force_control_msgs::ToolGravityParam();
+
+  a0 = (1+N*Ts);
+  a1 = -(2 + N*Ts);
+  a2 = 1;
+  b0 = Kp*(1+N*Ts) + Ki*Ts*(1+N*Ts) + Kd*N;
+  b1 = -(Kp*(2+N*Ts) + Ki*Ts + 2*Kd*N);
+  b2 = Kp + Kd*N;
+  ku1 = a1/a0; ku2 = a2/a0; ke0 = b0/a0; ke1 = b1/a0; ke2 = b2/a0;
+
+
 }
 
-std::vector<cv::Point3f> ImageProcessing::Generate3DPoints() {
-  std::vector<cv::Point3f> points;
-  points.push_back(cv::Point3f(0.04813, 0.00802, 0));  //B
-  points.push_back(cv::Point3f(0.00943, 0.0457, 0));  //G
-  points.push_back(cv::Point3f(0.090827, 0.04535, 0));  //R
-  points.push_back(cv::Point3f(0.09066, 0.004626, 0));  //W
-  return points;
+void Irp6Control::VelSteering(double v_y){
+
+    inertia1.x = 0.0;
+    inertia1.y = 0.0;
+    inertia1.z = 0.0;
+    inertia2.x = 0.0;
+    inertia2.y = 0.0;
+    inertia2.z = 0.0;
+
+    inertia.translation = inertia1;
+    inertia.rotation = inertia2;
+    forceControlGoal.inertia = inertia;
+
+    reciprocaldamping1.x = 0.0;
+    reciprocaldamping1.y = 0.0;
+    reciprocaldamping1.z = 0.0;
+
+    reciprocaldamping2.x = 0.0;
+    reciprocaldamping2.y = 0.0;
+    reciprocaldamping2.z = 0.0;
+
+    reciprocaldamping.translation = reciprocaldamping1;
+    reciprocaldamping.rotation = reciprocaldamping2;
+    forceControlGoal.reciprocaldamping = reciprocaldamping;
+
+    wrench1.x = 0.0;
+    wrench1.y = 0.0;
+    wrench1.z = 0.0;
+    wrench2.x = 0.0;
+    wrench2.y = 0.0;
+    wrench2.z = 0.0;
+
+    wrench.force = wrench1;
+    wrench.torque = wrench2;
+    forceControlGoal.wrench = wrench;
+
+    twist1.x = 0.0;
+    twist1.y = v_y;
+    twist1.z = 0.0;
+    twist2.x = 0.0;
+    twist2.y = 0.0;
+    twist2.z = 0.0;
+
+    twist.linear = twist1;
+    twist.angular = twist2;
+    forceControlGoal.twist = twist;
+
+    fcl_param_publisher.publish(forceControlGoal);
+
+    tg_goal.weight = 10.8;
+
+    mass_center.x = 0.004;
+    mass_center.y = 0.0;
+    mass_center.z = 0.156;
+    tg_goal.mass_center = mass_center;
+
+    tg_param_publisher.publish(tg_goal);
+}
+
+void Irp6Control::error_info_callback(const serwo::ErrorInfo& msg) {
+  error_y = msg.error;
+  found = msg.found;
+}
+
+void Irp6Control::pos_cartesian_y_callback(const geometry_msgs::Pose& msg) {
+  current_pos_cartesian_y = msg.position.y;
+}
+
+void Irp6Control::calculateNewVel() {
+    if (error_y > minError_y || error_y < -minError_y)
+    {
+        newVel_y = error_y * 4;
+    }
+    else
+    {
+      newVel_y = 0.0;
+    }
+
+  }
+
+void Irp6Control::calculateNewCartesianPose() {
+  new_pos_cartesian_y = current_pos_cartesian_y + newVel_y * (1 / frequency);
+}
+
+void Irp6Control::calculateNewAcceleration() {
+    newAcceleration_y = newVel_y * frequency;
+}
+
+void Irp6Control::checkVelocityLimits() {
+    if (newVel_y > maxVel_y){
+        newVel_y = maxVel_y;
+    }
+
+    if (newVel_y < -maxVel_y){
+        newVel_y = -maxVel_y;
+    }
+}
+
+void Irp6Control::checkCartesianLimits() {
+    if (new_pos_cartesian_y > min_max_pos_cartesian_y and new_pos_cartesian_y < -min_max_pos_cartesian_y) {
+      newVel_y = 0.0;
+    }
+}
+
+void Irp6Control::setZeroValues() {
+    newVel_y = 0.0;
+}
+
+void Irp6Control::setNewVelocity() {
+  checkVelocityLimits();
+  checkCartesianLimits();
+}
+
+void Irp6Control::calculateAndSetNewValues() {
+  if (found == 1) {
+    calculateNewVel();
+    calculateNewCartesianPose();
+    calculateNewAcceleration();
+    setNewVelocity();
+  } else
+    setZeroValues();
+}
+
+void Irp6Control::run() {
+    calculateAndSetNewValues();
+    VelSteering(newVel_y);
 }
 
 int main(int argc, char **argv) {
+  std::ofstream error_time;
+  error_time.open ("error.txt");
 
-   std::ofstream pnp_time;
-   pnp_time.open ("pnp_time.txt");
-   std::ofstream recognition_time;
-   recognition_time.open ("recognition_time.txt");
-
-
-  static char * tmp = NULL;
-  static int tmpi;
-  ros::init(tmpi, &tmp, "image_processing", ros::init_options::NoSigintHandler);
+  ros::init(argc, argv, "serwovision_control2");
   ros::NodeHandle nh;
-  ImageProcessing imageProcessing(nh);
-  int i = 0;
-  while (ros::ok() ){
-    imageProcessing.imagePoints = imageProcessing.Generate2DPoints(); //updating image points
+  Irp6Control control(nh);
 
-    if(imageProcessing.found == 1){
-    ++i;
-    cv::solvePnP(imageProcessing.objectPoints, imageProcessing.imagePoints,
-                 imageProcessing.cameraMatrix, imageProcessing.distCoeffs,
-                 imageProcessing.rvec, imageProcessing.tvec);//solvePnP
+  while (ros::ok())
+   {
+   error_time << control.error_y <<"\n";
+   control.run();
+   ros::spinOnce();
+   control.loop_rate.sleep();
+   }
+  error_time.close();
 
-    cv::Mat_<double> rotationMatrix;
-    cv::Rodrigues(imageProcessing.rvec, rotationMatrix);//change rvec to matrix
-    cv::Mat pattern_pose =
-        (cv::Mat_<double>(4, 4) << rotationMatrix(0, 0), rotationMatrix(0, 1), rotationMatrix(
-            0, 2), imageProcessing.tvec(0), rotationMatrix(1, 0), rotationMatrix(
-            1, 1), rotationMatrix(1, 2), imageProcessing.tvec(1), rotationMatrix(
-            2, 0), rotationMatrix(2, 1), rotationMatrix(2, 2), imageProcessing
-            .tvec(2), 0, 0, 0, 1);//final matrix (grid position in camera frame)
-    imageProcessing.msg.error = imageProcessing.tvec(0);
-
-    }
-    if(imageProcessing.found == 0){
-        imageProcessing.msg.error = 0;
-    }
-    imageProcessing.msg.found = imageProcessing.found;
-    imageProcessing.grid_info_pub.publish(imageProcessing.msg);//publish message
-
-    ros::spinOnce();
-  }
   return 0;
 }
+

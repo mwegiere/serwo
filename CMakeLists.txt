@@ -227,29 +227,29 @@ include_directories(
 
 include_directories(include ${catkin_INCLUDE_DIRS})
 
-add_executable(listener src/image_processing/listener.cpp)
-target_link_libraries(listener ${catkin_LIBRARIES})
-add_dependencies(listener serwo_generate_messages_cpp)
+#add_executable(listener src/image_processing/listener.cpp)
+#target_link_libraries(listener ${catkin_LIBRARIES})
+#add_dependencies(listener serwo_generate_messages_cpp)
 
-add_executable(image_process_diod src/y/image_process_diod.cpp)
-target_link_libraries(image_process_diod ${catkin_LIBRARIES})
-add_dependencies(image_process_diod serwo_generate_messages_cpp)
+#add_executable(image_process_diod src/y/image_process_diod.cpp)
+#target_link_libraries(image_process_diod ${catkin_LIBRARIES})
+#add_dependencies(image_process_diod serwo_generate_messages_cpp)
 
-add_executable(image_process_diod_time src/y/image_process_diod_time.cpp)
-target_link_libraries(image_process_diod_time ${catkin_LIBRARIES})
-add_dependencies(image_process_diod_time serwo_generate_messages_cpp)
+#add_executable(image_process_diod_time src/y/image_process_diod_time.cpp)
+#target_link_libraries(image_process_diod_time ${catkin_LIBRARIES})
+#add_dependencies(image_process_diod_time serwo_generate_messages_cpp)
 
-add_executable(image_process_chessboard_time src/y/image_process_chessboard_time.cpp)
-target_link_libraries(image_process_chessboard_time ${catkin_LIBRARIES})
-add_dependencies(image_process_chessboard_time serwo_generate_messages_cpp)
+#add_executable(image_process_chessboard_time src/y/image_process_chessboard_time.cpp)
+#target_link_libraries(image_process_chessboard_time ${catkin_LIBRARIES})
+#add_dependencies(image_process_chessboard_time serwo_generate_messages_cpp)
 
-add_executable(grid_visualization src/rviz/grid_visualization.cpp)
-target_link_libraries(grid_visualization ${catkin_LIBRARIES})
-add_dependencies(grid_visualization serwo_generate_messages_cpp)
+#add_executable(grid_visualization src/rviz/grid_visualization.cpp)
+#target_link_libraries(grid_visualization ${catkin_LIBRARIES})
+#add_dependencies(grid_visualization serwo_generate_messages_cpp)
 
-add_executable(grid_visualization_y src/y/grid_visualization_y.cpp)
-target_link_libraries(grid_visualization_y ${catkin_LIBRARIES})
-add_dependencies(grid_visualization_y serwo_generate_messages_cpp)
+#add_executable(grid_visualization_y src/y/grid_visualization_y.cpp)
+#target_link_libraries(grid_visualization_y ${catkin_LIBRARIES})
+#add_dependencies(grid_visualization_y serwo_generate_messages_cpp)
 
 #add_executable(irp6_control src/irp6_control/irp6_control.cpp)
 #target_link_libraries(irp6_control ${catkin_LIBRARIES})
@@ -259,18 +259,30 @@ add_dependencies(grid_visualization_y serwo_generate_messages_cpp)
 #target_link_libraries(irp6_control ${catkin_LIBRARIES})
 #add_dependencies(irp6_control force_control_msgs geometry_msgs)
 
-add_executable(irp6_control_nowe src/irp6_control/irp6_control_nowe.cpp)
-target_link_libraries(irp6_control_nowe ${catkin_LIBRARIES})
-add_dependencies(irp6_control_nowe force_control_msgs geometry_msgs)
+#add_executable(irp6_control_nowe src/irp6_control/irp6_control_nowe.cpp)
+#target_link_libraries(irp6_control_nowe ${catkin_LIBRARIES})
+#add_dependencies(irp6_control_nowe force_control_msgs geometry_msgs)
 
-add_executable(conveyor_visualization src/rviz/conveyor_visualization.cpp)
-target_link_libraries(conveyor_visualization ${catkin_LIBRARIES})
-add_dependencies(conveyor_visualization serwo_generate_messages_cpp)
+#add_executable(conveyor_visualization src/rviz/conveyor_visualization.cpp)
+#target_link_libraries(conveyor_visualization ${catkin_LIBRARIES})
+#add_dependencies(conveyor_visualization serwo_generate_messages_cpp)
+
+#add_executable(irp6_serwo_y src/y/irp6_serwo_y.cpp)
+#target_link_libraries(irp6_serwo_y ${catkin_LIBRARIES})
+##add_dependencies(irp6_serwo_y force_control_msgs geometry_msgs)
+
 
 add_executable(irp6_serwo_y src/y/irp6_serwo_y.cpp)
 target_link_libraries(irp6_serwo_y ${catkin_LIBRARIES})
 add_dependencies(irp6_serwo_y force_control_msgs geometry_msgs)
 
+add_executable(image_process_diod src/y/image_process_diod.cpp)
+target_link_libraries(image_process_diod ${catkin_LIBRARIES})
+add_dependencies(image_process_diod force_control_msgs geometry_msgs)
+
+add_executable(image_process_chessboard src/y/image_process_chessboard.cpp)
+target_link_libraries(image_process_chessboard ${catkin_LIBRARIES})
+add_dependencies(image_process_chessboard force_control_msgs geometry_msgs)
 
 
 
